@@ -2,7 +2,7 @@
 import { Connection, PublicKey, ConfirmedSignaturesForAddress2Options   } from '@solana/web3.js';
 import * as anchor from "@project-serum/anchor";
 import {BorshCoder, EventParser, Program, web3} from "@project-serum/anchor";
-import BN from 'bn.js';
+import { convertBNKeysToNative } from './util/bnUtil';
 
 import { readFileSync } from 'fs';
 // Set the endpoint for Solana's mainnet-beta network
@@ -10,27 +10,6 @@ const CLUSTER_URL = 'https://api.mainnet-beta.solana.com';
 
 const mango_account_address = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
-type ObjectWithBNKeys<T> = {
-    [K in keyof T]: T[K] extends BN ? string | number : T[K];
-  };
-  
-  function convertBNKeysToNative<T extends Record<string, unknown>>(obj: T): ObjectWithBNKeys<T> {
-    const newObj = {} as ObjectWithBNKeys<T>;
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = obj[key];
-        if (value instanceof BN) {
-          // Convert the BN.js object to a native number or string
-          newObj[key as keyof T] = value.toString() as ObjectWithBNKeys<T>[keyof T];
-          // Type assertion here ----^
-        } else {
-          // Keep the original value
-          newObj[key as keyof T] = value as ObjectWithBNKeys<T>[keyof T];
-        }
-      }
-    }
-    return newObj;
-}
 
 async function  test() {
     const connection = new Connection(CLUSTER_URL);
