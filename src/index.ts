@@ -1,50 +1,73 @@
 
-import { Connection, PublicKey, ConfirmedSignaturesForAddress2Options   } from '@solana/web3.js';
+import { Connection, PublicKey, ParsedTransactionWithMeta    } from '@solana/web3.js';
 import * as anchor from "@project-serum/anchor";
 import {BorshCoder, EventParser, Program, web3} from "@project-serum/anchor";
 import { convertBNKeysToNative } from './util/bnUtil';
 
 import { readFileSync } from 'fs';
+const delay = require('delay');
 // Set the endpoint for Solana's mainnet-beta network
 const CLUSTER_URL = 'https://api.mainnet-beta.solana.com';
 
 const mango_account_address = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
+const MANGO_ACCOUNT_PUBLICKEY = new PublicKey(mango_account_address);
 
-async function  test() {
-    const connection = new Connection(CLUSTER_URL);
-    
-    const mango_account_publicKey = new PublicKey(mango_account_address);
 
-    const balance = await connection.getBalance(mango_account_publicKey)
-    console.log('Balance', balance)
+async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>) {
+    for(let transactionWithMeta of transactionsWithMeta) {
 
-    let transactionList = await connection.getConfirmedSignaturesForAddress2(mango_account_publicKey, {limit:100});
-
-    console.log('Got transactions = ', transactionList.length)
-    let signatureList = transactionList.map(transaction=>transaction.signature);
-    let transactionDetails = await connection.getParsedTransactions(signatureList, {maxSupportedTransactionVersion:0});
-
-    for(let transaction of transactionDetails) {
-        const transaction = transactionDetails[0]
         const idl_file = await readFileSync('./src/mango_v4.json', 'utf-8');
         const idl = JSON.parse(idl_file)
     
-        const eventParser = new EventParser(mango_account_publicKey, new BorshCoder(idl))
+        const eventParser = new EventParser(MANGO_ACCOUNT_PUBLICKEY, new BorshCoder(idl))
     
-        if(transaction?.meta?.logMessages?.length) {
-            const events = eventParser.parseLogs(transaction?.meta?.logMessages)
+        if(transactionWithMeta?.meta?.logMessages?.length) {
+            const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
             for (let event of events) {
-                console.log(event.name);
-                console.log(convertBNKeysToNative(event.data))
+                // console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
+                // console.log('Block Time', transactionWithMeta.blockTime)
+                // console.log('Event Name', event.name);
+                // console.log('Event Data', convertBNKeysToNative(event.data))
             }
         }
     }
+}
+async function  getLatestTransaction(connection: Connection) {
 
+
+    let transactionList = await connection.getConfirmedSignaturesForAddress2(MANGO_ACCOUNT_PUBLICKEY, {limit:100});
+
+    console.log('Got transactions latest slot = ', transactionList[0].signature, ' and oldest slot = ', transactionList[transactionList.length - 1].signature)
+    let signatureList = transactionList.map(transaction=>transaction.signature);
+    let transactionsWithMeta = await connection.getParsedTransactions(signatureList, {maxSupportedTransactionVersion:0});
+
+    await processTransactionsWithMeta(transactionsWithMeta)
+
+    const lastProcessedSignature = transactionList[0].signature;
     
-    //console.log(Program.programId)
-    //const mangoClient = new MangoClient(new Connection(CLUSTER_URL), MANGO_PROGRAM_ID, 'mainnet-beta');
+    return lastProcessedSignature;
+}
+
+async function main() {
+    const connection = new Connection(CLUSTER_URL, {disableRetryOnRateLimit: true});
+    
+    
+    const balance = await connection.getBalance(MANGO_ACCOUNT_PUBLICKEY)
+    console.log('Balance', balance)
+    let delayTime = 1000
+    while(true) {
+        await delay(delayTime)
+        try{
+            await getLatestTransaction(connection)
+            delayTime = 1000
+        }catch(e) {
+            delayTime = delayTime * 2
+            console.log('Will try after delay ', delayTime)
+        }
+    
+    }
 
 }
 
-test()
+main()
