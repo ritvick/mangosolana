@@ -25,9 +25,9 @@ async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTra
             const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
             for (let event of events) {
                 console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
-                console.log('Block Time', transactionWithMeta.blockTime)
-                console.log('Event Name', event.name);
-                console.log('Event Data', convertBNKeysToNative(event.data))
+                // console.log('Block Time', transactionWithMeta.blockTime)
+                // console.log('Event Name', event.name);
+                // console.log('Event Data', convertBNKeysToNative(event.data))
 
                 const eventRecord = new MangoEvent({
                     transactionSignature: transactionWithMeta.transaction.signatures[0],
@@ -36,8 +36,19 @@ async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTra
                     eventData: convertBNKeysToNative(event.data)
                 })
 
-                const result = await eventRecord.save();
-                console.log('result', result)
+                const eventDocument = await MangoEvent.findOne({transactionSignature: transactionWithMeta.transaction.signatures[0] });
+                try {
+                    if(!eventDocument) {
+                        const result = await eventRecord.save();
+                        console.log('result', result)
+                    }else {
+                        console.log('Transaction already exists')
+                    }
+                }catch (error) {
+                    console.log('Insert Error')
+                }
+                
+
             }
 
         }
@@ -83,6 +94,7 @@ async function main() {
             delayTime = delayTime * 2
             console.log('Will try after delay ', delayTime)
         }
+        
 
     }
 }
