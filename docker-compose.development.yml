@@ -7,7 +7,7 @@ services:
     volumes:
       - ./:/usr/src/app
     command: >
-      /bin/sh -c "npm run start:dev"
+      /bin/sh -c "npm i && npm run start:dev"
     ports:
       - "4000:4000"
     links:
