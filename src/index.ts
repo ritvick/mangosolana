@@ -27,7 +27,7 @@ async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTra
             const eventDocument = await MangoEvent.findOne({transactionSignature: transactionWithMeta.transaction.signatures[0] });
 
             if(!eventDocument) {
-                console.log('logmessages', transactionWithMeta?.meta?.logMessages)
+                //console.log('logmessages', transactionWithMeta?.meta?.logMessages)
                 const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
                 for (let event of events) {
                     console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])

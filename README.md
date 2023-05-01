@@ -8,7 +8,7 @@ This is a Node TypeScript repository for parsing Mango events from transactions 
 
 ### Usage
 
-    docker-compose -f docker-compose.development.yml up
+    docker compose -f docker-compose.development.yml up
 
 This will bring the docker up and program will do the following:
 
