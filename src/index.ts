@@ -19,36 +19,34 @@ const MANGO_ACCOUNT_PUBLICKEY = new PublicKey(MANGO_ACCOUNT_ADDRESS);
 async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>, idl: any, db:any) {
     for(let transactionWithMeta of transactionsWithMeta) {
     
+        // Decoding data using idl provided.
         const eventParser = new EventParser(MANGO_ACCOUNT_PUBLICKEY, new BorshCoder(idl))
     
         if(transactionWithMeta?.meta?.logMessages?.length) {
-            const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
-            for (let event of events) {
-                console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
-                // console.log('Block Time', transactionWithMeta.blockTime)
-                // console.log('Event Name', event.name);
-                // console.log('Event Data', convertBNKeysToNative(event.data))
+            // Check if this transaction is already in processed and corresponding events are stored in database
+            const eventDocument = await MangoEvent.findOne({transactionSignature: transactionWithMeta.transaction.signatures[0] });
 
-                const eventRecord = new MangoEvent({
-                    transactionSignature: transactionWithMeta.transaction.signatures[0],
-                    eventName: event.name,
-                    blockTime: transactionWithMeta.blockTime,
-                    eventData: convertBNKeysToNative(event.data)
-                })
+            if(!eventDocument) {
+                console.log('logmessages', transactionWithMeta?.meta?.logMessages)
+                const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
+                for (let event of events) {
+                    console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
+                    console.log('event', event)
+                    // console.log('Block Time', transactionWithMeta.blockTime)
+                    // console.log('Event Name', event.name);
+                    // console.log('Event Data', convertBNKeysToNative(event.data))
 
-                const eventDocument = await MangoEvent.findOne({transactionSignature: transactionWithMeta.transaction.signatures[0] });
-                try {
-                    if(!eventDocument) {
-                        const result = await eventRecord.save();
-                        console.log('result', result)
-                    }else {
-                        console.log('Transaction already exists')
-                    }
-                }catch (error) {
-                    console.log('Insert Error')
+                    const eventRecord = new MangoEvent({
+                        transactionSignature: transactionWithMeta.transaction.signatures[0],
+                        eventName: event.name,
+                        blockTime: transactionWithMeta.blockTime,
+                        eventData: convertBNKeysToNative(event.data)
+                    })
+
+                    const result = await eventRecord.save();
                 }
-                
-
+            } else {
+                console.log('Transaction already processed!');
             }
 
         }
@@ -76,7 +74,7 @@ async function main() {
     console.log('Database Connected');
     const connection = new Connection(CLUSTER_URL, {disableRetryOnRateLimit: true});
     
-    
+    // Some code to print balance, just to check solanana maiinnet connectivity
     const balance = await connection.getBalance(MANGO_ACCOUNT_PUBLICKEY)
     console.log('Balance', balance)
 
@@ -85,6 +83,8 @@ async function main() {
     const eventTypes = idl.events.map(event=>event.name)
     console.log('Events', eventTypes)
     let delayTime = 1000
+
+    // Continuous polling, with exponential delays on rate limit.
     while(true) {
         await delay(delayTime)
         try{

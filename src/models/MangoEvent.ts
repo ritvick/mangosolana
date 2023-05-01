@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const MangoEventSchema = new mongoose.Schema({
-    transactionSignature: { type: String, required: true, unique: true},
+    transactionSignature: { type: String, required: true},
     eventName: String,
     blockTime: String,
     eventData: mongoose.Schema.Types.Mixed
