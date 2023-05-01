@@ -15,6 +15,8 @@ services:
     depends_on:
       postgres_container_development:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
   postgres_container_development:
     image: postgres
     restart: always
@@ -30,4 +32,23 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5        
+      retries: 5
+  mongodb:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+    expose:
+      - 27017
+    ports:
+      - 27017:27017
+    volumes:
+      - ./data:/data/db
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+

@@ -1,24 +1,20 @@
 
 import { Connection, PublicKey, ParsedTransactionWithMeta    } from '@solana/web3.js';
-import * as anchor from "@project-serum/anchor";
-import {BorshCoder, EventParser, Program, web3} from "@project-serum/anchor";
+import {BorshCoder, EventParser} from "@project-serum/anchor";
 import { convertBNKeysToNative } from './util/bnUtil';
-
 import { readFileSync } from 'fs';
 const delay = require('delay');
+
 // Set the endpoint for Solana's mainnet-beta network
 const CLUSTER_URL = 'https://api.mainnet-beta.solana.com';
 
-const mango_account_address = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
+const MANGO_ACCOUNT_ADDRESS = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 
-const MANGO_ACCOUNT_PUBLICKEY = new PublicKey(mango_account_address);
+const MANGO_ACCOUNT_PUBLICKEY = new PublicKey(MANGO_ACCOUNT_ADDRESS);
 
 
-async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>) {
+async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>, idl: any) {
     for(let transactionWithMeta of transactionsWithMeta) {
-
-        const idl_file = await readFileSync('./src/mango_v4.json', 'utf-8');
-        const idl = JSON.parse(idl_file)
     
         const eventParser = new EventParser(MANGO_ACCOUNT_PUBLICKEY, new BorshCoder(idl))
     
@@ -27,22 +23,22 @@ async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTra
             for (let event of events) {
                 // console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
                 // console.log('Block Time', transactionWithMeta.blockTime)
-                // console.log('Event Name', event.name);
+                console.log('Event Name', event.name);
                 // console.log('Event Data', convertBNKeysToNative(event.data))
             }
         }
     }
 }
-async function  getLatestTransaction(connection: Connection) {
+async function  getLatestTransaction(connection: Connection, idl: any) {
 
 
     let transactionList = await connection.getConfirmedSignaturesForAddress2(MANGO_ACCOUNT_PUBLICKEY, {limit:100});
 
-    console.log('Got transactions latest slot = ', transactionList[0].signature, ' and oldest slot = ', transactionList[transactionList.length - 1].signature)
+    console.log('Got transactions latest slot = ', transactionList[0].slot, ' and oldest slot = ', transactionList[transactionList.length - 1].slot)
     let signatureList = transactionList.map(transaction=>transaction.signature);
     let transactionsWithMeta = await connection.getParsedTransactions(signatureList, {maxSupportedTransactionVersion:0});
 
-    await processTransactionsWithMeta(transactionsWithMeta)
+    await processTransactionsWithMeta(transactionsWithMeta, idl)
 
     const lastProcessedSignature = transactionList[0].signature;
     
@@ -55,19 +51,23 @@ async function main() {
     
     const balance = await connection.getBalance(MANGO_ACCOUNT_PUBLICKEY)
     console.log('Balance', balance)
+
+    const idl_file = await readFileSync('./src/mango_v4.json', 'utf-8');
+    const idl = JSON.parse(idl_file)
+    const eventTypes = idl.events.map(event=>event.name)
+    console.log('Events', eventTypes)
     let delayTime = 1000
     while(true) {
         await delay(delayTime)
         try{
-            await getLatestTransaction(connection)
+            await getLatestTransaction(connection, idl)
             delayTime = 1000
         }catch(e) {
             delayTime = delayTime * 2
             console.log('Will try after delay ', delayTime)
         }
-    
+        break;
     }
-
 }
 
 main()
