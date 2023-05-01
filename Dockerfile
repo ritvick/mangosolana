@@ -5,4 +5,4 @@ WORKDIR /usr/src/app
 COPY package.json ./
 USER node
 COPY --chown=node:node . .
-RUN yarn
+RUN npm i
