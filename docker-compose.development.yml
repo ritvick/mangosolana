@@ -7,7 +7,7 @@ services:
     volumes:
       - ./:/usr/src/app
     command: >
-      /bin/sh -c "npx nodemon"
+      /bin/sh -c "start:dev"
     ports:
       - "4000:4000"
     links:
