@@ -3,6 +3,9 @@ import { Connection, PublicKey, ParsedTransactionWithMeta    } from '@solana/web
 import {BorshCoder, EventParser} from "@project-serum/anchor";
 import { convertBNKeysToNative } from './util/bnUtil';
 import { readFileSync } from 'fs';
+import MangoEvent from "./models/MangoEvent"
+import { connect as dbConnect } from './util/database';
+
 const delay = require('delay');
 
 // Set the endpoint for Solana's mainnet-beta network
@@ -13,7 +16,7 @@ const MANGO_ACCOUNT_ADDRESS = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'
 const MANGO_ACCOUNT_PUBLICKEY = new PublicKey(MANGO_ACCOUNT_ADDRESS);
 
 
-async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>, idl: any) {
+async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTransactionWithMeta | null>, idl: any, db:any) {
     for(let transactionWithMeta of transactionsWithMeta) {
     
         const eventParser = new EventParser(MANGO_ACCOUNT_PUBLICKEY, new BorshCoder(idl))
@@ -21,15 +24,26 @@ async function processTransactionsWithMeta(transactionsWithMeta: Array<ParsedTra
         if(transactionWithMeta?.meta?.logMessages?.length) {
             const events = eventParser.parseLogs(transactionWithMeta?.meta?.logMessages)
             for (let event of events) {
-                // console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
-                // console.log('Block Time', transactionWithMeta.blockTime)
+                console.log('Transacton Signature', transactionWithMeta.transaction.signatures[0])
+                console.log('Block Time', transactionWithMeta.blockTime)
                 console.log('Event Name', event.name);
-                // console.log('Event Data', convertBNKeysToNative(event.data))
+                console.log('Event Data', convertBNKeysToNative(event.data))
+
+                const eventRecord = new MangoEvent({
+                    transactionSignature: transactionWithMeta.transaction.signatures[0],
+                    eventName: event.name,
+                    blockTime: transactionWithMeta.blockTime,
+                    eventData: convertBNKeysToNative(event.data)
+                })
+
+                const result = await eventRecord.save();
+                console.log('result', result)
             }
+
         }
     }
 }
-async function  getLatestTransaction(connection: Connection, idl: any) {
+async function  getLatestTransaction(connection: Connection, idl: any, db:any) {
 
 
     let transactionList = await connection.getConfirmedSignaturesForAddress2(MANGO_ACCOUNT_PUBLICKEY, {limit:100});
@@ -38,7 +52,7 @@ async function  getLatestTransaction(connection: Connection, idl: any) {
     let signatureList = transactionList.map(transaction=>transaction.signature);
     let transactionsWithMeta = await connection.getParsedTransactions(signatureList, {maxSupportedTransactionVersion:0});
 
-    await processTransactionsWithMeta(transactionsWithMeta, idl)
+    await processTransactionsWithMeta(transactionsWithMeta, idl, db)
 
     const lastProcessedSignature = transactionList[0].signature;
     
@@ -46,6 +60,9 @@ async function  getLatestTransaction(connection: Connection, idl: any) {
 }
 
 async function main() {
+    console.log('Connecting to database....');
+    const db = await dbConnect();
+    console.log('Database Connected');
     const connection = new Connection(CLUSTER_URL, {disableRetryOnRateLimit: true});
     
     
@@ -60,14 +77,15 @@ async function main() {
     while(true) {
         await delay(delayTime)
         try{
-            await getLatestTransaction(connection, idl)
+            await getLatestTransaction(connection, idl, db)
             delayTime = 1000
         }catch(e) {
             delayTime = delayTime * 2
             console.log('Will try after delay ', delayTime)
         }
-        break;
+
     }
 }
+
 
 main()
